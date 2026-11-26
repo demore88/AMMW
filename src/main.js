@@ -106,7 +106,7 @@ addEventListener('resize', resize); setupPost(); resize();
 // ------------------------------------------------------------ sound (synthesised, no files)
 const AU = {
   ac: null, out: null,
-  init() { if (this.ac) return; try { this.ac = new (window.AudioContext || window.webkitAudioContext)(); this.out = this.ac.createGain(); this.out.gain.value = 0.5; this.out.connect(this.ac.destination); this.nb = this.ac.createBuffer(1, this.ac.sampleRate, this.ac.sampleRate); const d = this.nb.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; } catch (e) {} },
+  init() { if (this.ac) { if (this.ac.state === 'suspended' && !document.hidden) this.ac.resume(); return; } try { this.ac = new (window.AudioContext || window.webkitAudioContext)(); this.out = this.ac.createGain(); this.out.gain.value = 0.5; this.out.connect(this.ac.destination); this.nb = this.ac.createBuffer(1, this.ac.sampleRate, this.ac.sampleRate); const d = this.nb.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; } catch (e) {} },
   noise(dur, f, type, vol, at = 0) { if (!this.ac || !P.set.sound) return; const t = this.ac.currentTime + at, s = this.ac.createBufferSource(); s.buffer = this.nb; const fl = this.ac.createBiquadFilter(); fl.type = type; fl.frequency.value = f; const g = this.ac.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); s.connect(fl); fl.connect(g); g.connect(this.out); s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.05); },
   tone(f0, f1, dur, vol, type = 'square', at = 0) { if (!this.ac || !P.set.sound) return; const t = this.ac.currentTime + at, o = this.ac.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur); const g = this.ac.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); o.connect(g); g.connect(this.out); o.start(t); o.stop(t + dur + 0.02); },
   vol(p) { if (!p || !G) return 1; return clamp(1 - camera.position.distanceTo(p) / 70, 0.05, 1); },
@@ -302,7 +302,7 @@ function hurt(s, dmg, by, kind, dir) {
   if (s.isPlayer && by && !by.isPlayer) dmg *= G.botDmg;
   if (by && G.player && by.team === G.player.team && s.team !== G.player.team) s.spotT = 5;
   s.hp -= dmg; s.lastHurt = 0; s.hurtFrom = by; s.hurtBy = by && by.cls;
-  if (by && by !== s) { by.hits++; if (by.isPlayer) { AU.hit(); flashHit(); } }
+  if (by && by !== s) { if (kind === 'shot' || kind === 'head') by.hits++; if (by.isPlayer) { AU.hit(); flashHit(); } }
   if (s.isPlayer) { $('hurt').style.boxShadow = 'inset 0 0 90px rgba(210,30,20,.75)'; setTimeout(() => $('hurt').style.boxShadow = 'inset 0 0 90px rgba(210,30,20,0)', 160); }
   if (s.hp <= 0) knockOver(s, by, kind, dir);
 }
@@ -640,7 +640,7 @@ function minigun(s, v) {
   const { p, d0 = null } = {}; const g = v.gunMuzzle(), d = g.d.clone().add(new THREE.Vector3(rnd(-0.02, 0.02), rnd(-0.02, 0.02), rnd(-0.02, 0.02))).normalize(), mz = g.p;
   const wt0 = world.ray(mz, d, 80), vh = rayVehicles(mz, d, wt0, s), wt = Math.min(wt0, vh.t), mh = rayMen(mz, d, wt, s);
   const end = mz.clone().addScaledVector(d, mh.who ? mh.t : wt);
-  v.mgShots = (v.mgShots || 0) + 1; if (v.mgShots % 3 === 0) tracer(mz, end, 0xffb050, 1.4);
+  v.mgShots = (v.mgShots || 0) + 1; if (s.isPlayer) { s.shots++; G.ps.shots++; } if (v.mgShots % 3 === 0) tracer(mz, end, 0xffb050, 1.4);
   part('flash', mz, { size: 0.35, life: 0.04, grow: 2 }); if (v.mgShots % 2 === 0) casing(mz.clone().addScaledVector(d, -0.6), new THREE.Vector3(-Math.cos(v.yaw + v.mgYawA), 0.3, Math.sin(v.yaw + v.mgYawA)));
   flashLight(mz, 14, 6, 0.05); if (v.mgShots % 2 === 0) AU.shot(mz, 'rifle');
   if (mh.who && mh.who.team !== s.team) hurt(mh.who, 11, s, 'shot', d);
@@ -1199,7 +1199,8 @@ function endMatch() {
   if (G.over) return; G.over = true; IN.fire = false;
   const me = G.player, won = G.score[0] === Math.max(...G.score) && G.score.filter((v) => v === G.score[0]).length === 1;
   const st = P.stats, ps = G.ps;
-  st.matches++; won ? st.wins++ : st.losses++; st.kills += ps.kills; st.deaths += ps.deaths; st.shots += ps.shots; st.hits += me.hits;
+  const top = Math.max(...G.score), draw = !won && G.score[0] === top;
+  st.matches++; if (won) st.wins++; else if (!draw) st.losses++; st.kills += ps.kills; st.deaths += ps.deaths; st.shots += ps.shots; st.hits += me.hits;
   st.headshots = (st.headshots || 0) + (ps.headshots || 0); st.nadeKills += ps.nadeKills; st.rocketKills += ps.rocketKills; st.melts += ps.melts; st.bestStreak = Math.max(st.bestStreak, ps.bestStreak); st.bestMatch = Math.max(st.bestMatch, ps.kills); st.time += G.elapsed;
   for (const [c, n] of Object.entries(ps.classKills)) st.classKills[c] = (st.classKills[c] || 0) + n;
   if (won) st.mapWins[P.map] = (st.mapWins[P.map] || 0) + 1;
@@ -1207,7 +1208,7 @@ function endMatch() {
   setTimeout(() => {
     mode = 'over'; if (document.pointerLockElement) document.exitPointerLock();
     const rows = G.men.slice().sort((a, b) => b.k - a.k || a.d - b.d).slice(0, 8);
-    menu(won ? 'VICTORY' : 'DEFEAT', `
+    menu(won ? 'VICTORY' : draw ? 'DRAW' : 'DEFEAT', `
       <div class="row" style="gap:6px;margin-bottom:8px">${G.score.map((v, i) => `<div class="sc" style="background:${TEAMS[G.teamIds[i]].css};font-size:22px">${TEAMS[G.teamIds[i]].name}: ${v}</div>`).join('')}</div>
       <div class="split"><div><table class="st">
         <tr><td>Knockdowns</td><td>${ps.kills}</td></tr><tr><td>Knocked over</td><td>${ps.deaths}</td></tr>
@@ -1221,7 +1222,7 @@ function endMatch() {
 // ------------------------------------------------------------ screens and menus
 function showScreen(s) {
   mode = s;
-  $('title').classList.toggle('hidden', s !== 'title');
+  $('title').classList.toggle('hidden', s !== 'title'); $('credit').classList.toggle('hidden', s !== 'title');
   $('hud').classList.toggle('hidden', !(s === 'play' || s === 'paused'));
   $('touch').classList.toggle('hidden', !(s === 'play' && isTouch));
   if (s !== 'play' && s !== 'paused') $('menu').classList.add('hidden');
@@ -1233,9 +1234,9 @@ function menu(title, html, closable = true) {
   m.innerHTML = `<div class="box"><div class="head stencil">${title}</div>${closable ? '<button class="x" data-act="close" aria-label="Close">✕</button>' : ''}<div class="body">${html}</div></div>`;
 }
 function pause() {
-  if (mode !== 'play') return; mode = 'paused'; IN.fire = false; if (document.pointerLockElement) document.exitPointerLock();
+  if (mode !== 'play') return; mode = 'paused'; IN.fire = false; IN.jx = IN.jy = 0; IN.ptrs.clear(); joyEl.classList.add('hidden'); AU.mowerVol(0); if (G) { G.nadeAim = false; } if (document.pointerLockElement) document.exitPointerLock();
   $('touch').classList.add('hidden');
-  menu('PAUSED', `<div class="row"><button class="b go" data-act="resume">Resume</button><button class="b" data-act="options">Options</button><button class="b" data-act="quit">Quit match</button></div><p style="font-size:14px;margin:12px 0 0">Quitting doesn't count toward your record.</p>`);
+  menu('PAUSED', `<div class="row"><button class="b go" data-act="resume">Resume</button><button class="b" data-act="options">Options</button><button class="b" data-act="howto">How to Play</button><button class="b" data-act="quit">Quit match</button></div><p style="font-size:14px;margin:12px 0 0">Quitting doesn't count toward your record.</p>`);
 }
 function playMenu() {
   const opt = (obj, key, cur) => Object.entries(obj).map(([id, o]) => `<button class="card${id === cur ? ' sel' : ''}" data-pick="${key}" data-v="${id}">${o.name}<small>${o.blurb}</small></button>`).join('');
@@ -1246,6 +1247,20 @@ function playMenu() {
     <div class="lbl">Your piece</div><div class="cards">${opt(CLASSES, 'cls', P.cls)}</div>
     <div class="lbl">Enemy skill</div><div class="row">${['easy', 'normal', 'hard'].map((d) => `<button class="b${d === P.set.diff ? ' on' : ''}" data-pick="diff" data-v="${d}">${d[0].toUpperCase() + d.slice(1)}</button>`).join('')}</div>
     <div class="row" style="margin-top:14px"><button class="b go stencil" data-act="start">DEPLOY</button></div>`);
+}
+function howMenu() {
+  const rows = isTouch ? [
+    ['Move', 'Left thumb anywhere on the left side'], ['Look', 'Drag anywhere on the right side'], ['FIRE', 'Hold to shoot; you can drag it to aim'],
+    ['AIM', 'Tap to raise your sights. FIRE becomes SHOOT: drag to aim, let go to fire'], ['NADE', 'Hold to see the arc, let go to throw'], ['CROUCH', 'Tap to crouch, double tap to go prone'],
+    ['JUMP', 'Jump, or stand up from crouch or prone'], ['SMACK', 'Rifle-butt anyone close'], ['GET IN', 'Appears next to jeeps, tanks and planes'], ['VIEW', 'First or third person'], ['Minimap', 'Hold it to open the big map'],
+  ] : [
+    ['WASD', 'Move'], ['Mouse', 'Look (click the game first)'], ['Left click', 'Fire'], ['Right click', 'Hold to aim down sights'], ['G', 'Hold to aim a grenade, release to throw'], ['Q / Ctrl', 'Crouch, double tap for prone'],
+    ['Space', 'Jump or stand up'], ['V', 'Smack'], ['E', 'Get in or out of vehicles'], ['R', 'Reload'], ['C', 'First or third person'], ['M', 'Big map'], ['P', 'Pause'],
+  ];
+  menu('HOW TO PLAY', `<div class="how">${rows.map(([k, v]) => `<div><b>${k}</b> ${v}</div>`).join('')}</div>
+    <div class="lbl">Good to know</div>
+    <div class="how"><div>Three body shots or one headshot knocks a soldier over.</div><div>Crouching, going prone and aiming all steady your shots.</div><div>Jeeps seat a driver, a passenger and a minigunner. Teammates hop in when you slow down.</div><div>Planes drop a bomb every 5 seconds. A bazooka held on a plane for 3 seconds locks on.</div><div>Watch out for the cat, the kid and Dad's lawn mower.</div><div>Knockdowns earn allowance to spend in the Barracks.</div></div>
+    <div class="row" style="margin-top:12px"><button class="b go" data-act="${mode === 'paused' ? 'resume' : 'close'}">Got it</button></div>`);
 }
 function recordMenu() {
   const s = P.stats, acc = s.shots ? Math.round((s.hits / s.shots) * 100) : 0, kd = (s.kills / Math.max(1, s.deaths)).toFixed(2);
@@ -1269,7 +1284,8 @@ function optionsMenu(back) {
       <button class="b${P.set.fps ? ' on' : ''}" data-tog="fps">Show FPS ${P.set.fps ? 'on' : 'off'}</button></div>
     <div class="lbl">View</div><div class="row">${[['fp', 'First person'], ['tp', 'Over the shoulder']].map(([k, n]) => `<button class="b${P.set.view === k ? ' on' : ''}" data-view="${k}">${n}</button>`).join('')}</div>
     <div class="lbl">Graphics</div><div class="row">${[['low', 'Low (fastest)'], ['medium', 'Medium (default)'], ['high', 'High (strong PC)']].map(([k, n]) => `<button class="b${P.set.q === k ? ' on' : ''}" data-q="${k}">${n}</button>`).join('')}</div>
-    <p style="font-size:14px;margin:12px 0 0">Phone: left thumb anywhere on the left moves; drag the right side (or the FIRE button) to aim. Hold the minimap for the big map.<br>Computer: WASD, mouse, click to fire, Space jump, F smack, G grenade, R reload, right-click scope, C view, M map, P pause.</p>
+    <div class="lbl">About</div><p style="font-size:13px;margin:0">Army Men: Microplastic Warfare v1.0 by No End Studios. Your record, allowance and gear are saved only on this device; nothing is sent anywhere. Built with three.js (MIT) and Rapier physics (Apache 2.0).</p>
+    ${back ? '' : '<div class="row" style="margin-top:10px"><button class="b" data-act="howto">How to Play</button><button class="b" data-act="wipe">Reset my record and gear</button></div>'}
     ${back ? '<div class="row" style="margin-top:12px"><button class="b go" data-act="resume">Back to battle</button></div>' : ''}`);
   $('sens').addEventListener('input', (e) => { P.set.sens = +e.target.value; $('sensV').textContent = P.set.sens.toFixed(1); save(); });
 }
@@ -1316,6 +1332,8 @@ $('menu').addEventListener('click', (e) => {
   if (act === 'start') { startMatch(); return; }
   if (act === 'resume') { resume(); return; }
   if (act === 'options') { optionsMenu(mode === 'paused'); return; }
+  if (act === 'howto') { howMenu(); return; }
+  if (act === 'wipe') { if (t.dataset.sure) { try { localStorage.removeItem(SAVE); } catch (e) {} location.reload(); } else { t.dataset.sure = 1; t.textContent = 'Tap again to erase everything'; } return; }
   if (act === 'quit' || act === 'home') { goHome(); return; }
   if (act === 'again') { startMatch(); return; }
   if (t.dataset.pick) { const k = t.dataset.pick, v = t.dataset.v; if (k === 'team') P.team = +v; else if (k === 'diff') P.set.diff = v; else P[k] = v; save(); playMenu(); return; }
@@ -1333,7 +1351,7 @@ $('menu').addEventListener('click', (e) => {
 $('title').addEventListener('click', (e) => {
   const t = e.target.closest('button'); if (!t) return; AU.init(); AU.ui();
   if (t.dataset.act === 'full') { const d = document.documentElement; if (document.fullscreenElement) document.exitFullscreen?.(); else (d.requestFullscreen || d.webkitRequestFullscreen)?.call(d)?.then?.(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => toast('Full screen is blocked here - open the game file in your browser', 3)); return; }
-  ({ play: playMenu, barracks: () => barracksMenu(), record: recordMenu, options: () => optionsMenu(false) })[t.dataset.act]?.();
+  ({ play: playMenu, barracks: () => barracksMenu(), record: recordMenu, howto: howMenu, options: () => optionsMenu(false) })[t.dataset.act]?.();
 });
 function resume() { $('menu').classList.add('hidden'); showScreen('play'); }
 function goHome() { clearMen(); G = null; titleScene(); showScreen('title'); }
@@ -1384,5 +1402,13 @@ function tick(dt, t) {
   updateFX(dt); updateLeaks(dt); dynRes(dt);
   renderFrame(dt);
 }
-initPhysics().then(() => { titleScene(); showScreen('title'); requestAnimationFrame(loop); });
-window.__pf = { LEAKS, mower: () => startMower(), critter: (k) => startCritter(k), portrait(team, cls, head, skin) { for (const m of titleMen) m.root.visible = false; const m = buildSoldier(TEAMS[team].color, cls, { head, skin }); m.root.position.set(0, 0.12, 8); m.root.rotation.y = 0; scene.add(m.root); titleMen.push(m); return true; }, cam(x, y, z, tx, ty, tz) { mode = 'cu'; camera.fov = 40; camera.updateProjectionMatrix(); camera.position.set(x, y, z); camera.lookAt(tx, ty, tz); }, renderer, DYN,  THREE, vm, IN, use: () => useVehicle(G.player), knockDown: (s, v) => knockDown(s, new THREE.Vector3(...v)), explode: (x, y, z, s) => explosion(new THREE.Vector3(x, y, z), s, 'nade'), PH,  closeup() { mode = 'cu'; camera.position.set(-6.2, 0.75, -1.2); camera.lookAt(-7.5, 0.5, -3); }, get G() { return G; }, startMatch, P, step(n) { for (let i = 0; i < n; i++) tick(0.033, i * 0.033); } };
+initPhysics().then(() => {
+  titleScene(); showScreen('title'); requestAnimationFrame(loop);
+  window.__booted = true; $('boot').remove();
+  if (!P.seenHow) { P.seenHow = 1; save(); howMenu(); }
+}).catch(() => window.__bootFail());
+canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); if (mode === 'play') pause(); menu('GRAPHICS RESET', '<p>Your device took the 3D graphics away from the game (this can happen when memory runs low).</p><div class="row"><button class="b go" onclick="location.reload()">Reload the game</button></div>', false); });
+// leaving the app pauses the match and silences everything
+document.addEventListener('visibilitychange', () => { if (document.hidden) { if (mode === 'play') pause(); AU.mowerVol(0); AU.ac?.suspend?.(); } else AU.ac?.resume?.(); });
+addEventListener('gesturestart', (e) => e.preventDefault());
+window.__pf = { hurt: (s, d, by, k) => hurt(s, d, by, k), LEAKS, mower: () => startMower(), critter: (k) => startCritter(k), portrait(team, cls, head, skin) { for (const m of titleMen) m.root.visible = false; const m = buildSoldier(TEAMS[team].color, cls, { head, skin }); m.root.position.set(0, 0.12, 8); m.root.rotation.y = 0; scene.add(m.root); titleMen.push(m); return true; }, cam(x, y, z, tx, ty, tz) { mode = 'cu'; camera.fov = 40; camera.updateProjectionMatrix(); camera.position.set(x, y, z); camera.lookAt(tx, ty, tz); }, renderer, DYN,  THREE, vm, IN, use: () => useVehicle(G.player), knockDown: (s, v) => knockDown(s, new THREE.Vector3(...v)), explode: (x, y, z, s) => explosion(new THREE.Vector3(x, y, z), s, 'nade'), PH,  closeup() { mode = 'cu'; camera.position.set(-6.2, 0.75, -1.2); camera.lookAt(-7.5, 0.5, -3); }, get G() { return G; }, startMatch, P, step(n) { for (let i = 0; i < n; i++) tick(0.033, i * 0.033); } };
