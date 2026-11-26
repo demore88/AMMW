@@ -1,0 +1,14 @@
+{
+  "name": "Army Men: Microplastic Warfare",
+  "short_name": "Army Men",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#2c421b",
+  "theme_color": "#2c421b",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

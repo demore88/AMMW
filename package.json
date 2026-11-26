@@ -1,0 +1,18 @@
+{
+  "name": "ammw",
+  "version": "1.0.0",
+  "description": "Army Men: Microplastic Warfare - 3D toy-soldier shooter for phones",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "three": "0.170.0",
+    "@dimforge/rapier3d-compat": "0.14.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#2f4f1f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Army Men: Microplastic Warfare</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Nunito:wght@800;900&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a kid's floor war — loud, chunky, toy-box
+   IDEA: the cardboard box the army men came in; menus are its flaps and labels
+   PICTURE: the 3D room itself, always live behind the menus
+   COLOUR and TYPE: olive drab card, tan kraft paper, one hot red accent; Black Ops One stencil + Nunito 900
+   LAYOUT: landscape phone only; HUD on the top edge, thumbs on the bottom corners */
+:root{--olive:#3d5a26;--olive2:#2c421b;--kraft:#d8bf8a;--kraft2:#c3a66c;--ink:#1d2414;--red:#d3392b;--cream:#f4ead2}
+*{box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#111;color:var(--cream);font:900 16px/1.3 Nunito,system-ui,sans-serif;user-select:none;-webkit-user-select:none;touch-action:none;overscroll-behavior:none}
+canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
+.hidden{display:none!important}
+.stencil{font-family:'Black Ops One',Impact,sans-serif;font-weight:400;letter-spacing:.02em}
+/* ---------- menus: the toy box */
+#menu{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:max(10px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) 10px max(14px,env(safe-area-inset-left))}
+.box{position:relative;background:var(--kraft);color:var(--ink);border:4px solid var(--ink);border-radius:6px;box-shadow:0 8px 0 var(--ink),0 14px 40px rgba(0,0,0,.5);max-height:calc(100vh - 34px);width:min(760px,100%);display:flex;flex-direction:column;overflow:hidden}
+.box>.head{background:var(--olive);color:var(--cream);padding:8px 52px 8px 16px;border-bottom:4px solid var(--ink);font-size:24px}
+.box>.body{padding:12px 16px 14px;overflow-y:auto;touch-action:pan-y}
+.x{position:absolute;right:6px;top:5px;width:40px;height:40px;border:3px solid var(--ink);background:var(--red);color:#fff;border-radius:6px;font:900 20px Nunito,system-ui,sans-serif;cursor:pointer;z-index:2}
+button.b{font:900 17px Nunito,system-ui;color:var(--ink);background:var(--cream);border:3px solid var(--ink);border-radius:6px;padding:10px 14px;min-height:46px;cursor:pointer;box-shadow:0 4px 0 var(--ink)}
+button.b:active{transform:translateY(3px);box-shadow:0 1px 0 var(--ink)}
+button.b.go{background:var(--red);color:#fff;font-size:22px}
+button.b.on{background:var(--olive);color:var(--cream)}
+button.b:disabled{opacity:.45}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.lbl{font-size:13px;text-transform:uppercase;opacity:.75;margin:10px 0 5px}
+#title{position:fixed;inset:0;z-index:19;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;padding:0 max(5vw,20px);pointer-events:none}
+#title h1{margin:0;font-size:clamp(40px,10vh,84px);line-height:1;color:var(--cream);text-shadow:0 5px 0 var(--olive2),0 8px 18px rgba(0,0,0,.6)}
+#title .sub2{font-size:clamp(16px,4vh,30px);color:#ffe27a;text-shadow:0 3px 0 var(--olive2),0 6px 14px rgba(0,0,0,.6);margin-top:2px}
+#title .sub{font-size:15px;margin:6px 0 18px;color:var(--kraft);text-shadow:0 2px 4px #000}
+#title .stack{display:flex;flex-direction:column;gap:10px;pointer-events:auto;width:min(270px,42vw)}
+#title .coins{position:fixed;top:max(10px,env(safe-area-inset-top));right:16px;background:var(--kraft);color:var(--ink);border:3px solid var(--ink);border-radius:6px;padding:4px 10px;font-size:16px;pointer-events:auto}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.card{border:3px solid var(--ink);border-radius:6px;background:var(--cream);padding:8px;cursor:pointer;text-align:left;font:900 15px Nunito,system-ui,sans-serif;color:var(--ink);min-height:58px}
+.card small{display:block;font-weight:800;font-size:12px;opacity:.7}
+.card.sel{background:var(--olive);color:var(--cream)}
+.card.lock{opacity:.8;background:#e6dcc4}
+.sw{width:44px;height:44px;border:3px solid var(--ink);border-radius:50%;cursor:pointer}
+.sw.sel{outline:4px solid var(--red);outline-offset:2px}
+table.st{width:100%;border-collapse:collapse;font-size:15px}
+table.st td{padding:6px 4px;border-bottom:2px dashed rgba(0,0,0,.2)}
+table.st td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:14px}
+#preview{width:100%;aspect-ratio:1;max-height:56vh;border:3px solid var(--ink);border-radius:6px;background:#6b4a2b;display:block}
+input.t{font:900 16px Nunito,system-ui,sans-serif;border:3px solid var(--ink);border-radius:6px;padding:8px;width:100%;background:var(--cream)}
+input[type=range]{width:100%;accent-color:var(--olive)}
+/* ---------- HUD */
+#hud{position:fixed;inset:0;z-index:5;pointer-events:none}
+#topbar{position:absolute;top:max(6px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);display:flex;gap:6px;align-items:center}
+.sc{min-width:42px;padding:2px 8px;border-radius:5px;border:2px solid rgba(0,0,0,.6);font-size:18px;text-align:center;color:#fff;text-shadow:0 1px 2px #000}
+.sc.me{outline:2px solid #fff}
+#clock{font-size:16px;padding:2px 8px;background:rgba(0,0,0,.45);border-radius:5px}
+#pauseB{pointer-events:auto;width:34px;height:30px;border-radius:5px;border:2px solid rgba(255,255,255,.5);background:rgba(0,0,0,.35);color:#fff;font:900 14px Nunito}
+#vitals{position:absolute;top:max(8px,env(safe-area-inset-top));left:max(10px,env(safe-area-inset-left));width:150px}
+#hpbar{height:12px;border-radius:6px;background:rgba(0,0,0,.5);overflow:hidden;border:2px solid rgba(0,0,0,.6)}
+#hpfill{height:100%;width:100%;background:#7fd24a;transition:width .1s}
+#ammo{margin-top:3px;font-size:15px;text-shadow:0 1px 3px #000;pointer-events:auto}
+#feed{margin-top:6px;font-size:12px;line-height:1.35;text-shadow:0 1px 2px #000}
+#feed div{opacity:.95}
+#mini{position:absolute;top:max(6px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));width:112px;height:112px;border-radius:8px;border:3px solid rgba(0,0,0,.55);background:rgba(0,0,0,.25);pointer-events:auto;touch-action:none}
+#mini.big{width:min(70vh,60vw);height:min(70vh,60vw);right:50%;top:50%;transform:translate(50%,-50%)}
+#cross{position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px}
+#cross i{position:absolute;background:#fff;box-shadow:0 0 2px #000}
+#cross i:nth-child(1){left:12px;top:0;width:2px;height:8px}#cross i:nth-child(2){left:12px;bottom:0;width:2px;height:8px}
+#cross i:nth-child(3){top:12px;left:0;height:2px;width:8px}#cross i:nth-child(4){top:12px;right:0;height:2px;width:8px}
+#cross.hit i{background:var(--red)}
+#cross.foe i{background:#ff4a3a}
+#cross.friend i{background:#7fe05a}
+#tankSight{position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,transparent 0 30vh,rgba(10,14,8,.85) 30.5vh)}
+#tankSight i{position:absolute;left:50%;top:50%;width:46vh;height:2px;margin-left:-23vh;background:rgba(255,255,255,.6);box-shadow:0 -10vh 0 rgba(255,255,255,0),0 6vh 0 -1px rgba(255,255,255,.4)}
+#scope{position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,transparent 0 27vh,rgba(0,0,0,.92) 27.4vh)}
+#callout{position:absolute;left:50%;top:26%;transform:translate(-50%,-50%) scale(.6);font-size:30px;color:#ffe27a;text-shadow:0 3px 0 #5a3a00,0 0 18px rgba(255,190,60,.6);opacity:0;white-space:nowrap}
+#callout.pop{animation:pop 1.6s ease-out forwards}
+@keyframes pop{0%{opacity:0;transform:translate(-50%,-50%) scale(1.6)}12%{opacity:1;transform:translate(-50%,-50%) scale(1)}75%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(.95)}}
+#toast{position:absolute;left:50%;top:58%;transform:translateX(-50%);font-size:16px;text-shadow:0 2px 3px #000;white-space:nowrap}
+#hurt{position:absolute;inset:0;box-shadow:inset 0 0 90px rgba(210,30,20,.0);transition:box-shadow .25s}
+#cross i{transition:background .08s}
+#dead{position:absolute;left:50%;top:34%;transform:translate(-50%,-50%);text-align:center;pointer-events:auto}
+#dead .big{font-size:30px;text-shadow:0 3px 0 #000}
+#dead .row{justify-content:center;margin-top:8px}
+#dead .card{min-height:0;padding:6px 10px}
+/* ---------- touch controls (see-through, thumbs on the corners) */
+#touch{position:fixed;inset:0;z-index:6;touch-action:none}
+.tb{position:absolute;border-radius:50%;border:2px solid rgba(255,255,255,.55);background:rgba(255,255,255,.14);color:rgba(255,255,255,.85);font:900 13px Nunito;display:flex;align-items:center;justify-content:center;text-shadow:0 1px 2px #000;opacity:.42}
+.tb.down{background:rgba(255,255,255,.35);opacity:.7}
+/* right thumb: FIRE in the corner; AIM, JUMP and NADE stacked above it; RELOAD to the left */
+#bFire{width:72px;height:72px;right:calc(20px + env(safe-area-inset-right));bottom:18px;font-size:13px}
+#bAim{width:46px;height:46px;right:calc(33px + env(safe-area-inset-right));bottom:98px;font-size:10px}
+#bAim.on{background:rgba(255,90,70,.35);border-color:#ff8a70;opacity:.8}
+#bJump{width:46px;height:46px;right:calc(33px + env(safe-area-inset-right));bottom:152px;font-size:10px}
+#bNade{width:48px;height:48px;right:calc(32px + env(safe-area-inset-right));bottom:206px;font-size:10px}
+#bReload{width:42px;height:42px;right:calc(102px + env(safe-area-inset-right));bottom:26px;font-size:9px}
+#bScope{display:none!important}
+#bUse{width:56px;height:56px;right:calc(156px + env(safe-area-inset-right));bottom:22px;font-size:10px;opacity:.6;border-color:#ffe27a}
+/* left corner: SMACK and CROUCH, tucked against the edge so the stick has room */
+#bMelee{width:46px;height:46px;left:calc(12px + env(safe-area-inset-left));bottom:12px;font-size:9px}
+#bCrouch{width:46px;height:46px;left:calc(12px + env(safe-area-inset-left));bottom:66px;font-size:9px}
+#bCrouch.prone{background:rgba(255,226,122,.35);border-color:#ffe27a}
+/* view switch sits at the top-left corner of the minimap */
+#bView{width:34px;height:34px;right:calc(126px + env(safe-area-inset-right));top:calc(6px + env(safe-area-inset-top));font-size:9px}
+#fireStick{position:absolute;width:70px;height:70px;margin:-35px 0 0 -35px;border-radius:50%;border:2px solid rgba(255,120,100,.6);pointer-events:none}
+#lock{position:absolute;left:50%;top:50%;width:70px;height:70px;margin:-35px 0 0 -35px;border:2px solid #ff4a3a;border-radius:50%;box-shadow:0 0 8px #ff4a3a}
+#lockT{position:absolute;left:50%;top:calc(50% + 42px);transform:translateX(-50%);font-size:12px;color:#ff6a5a;text-shadow:0 1px 2px #000}
+#joy{position:absolute;width:110px;height:110px;margin:-55px 0 0 -55px;border-radius:50%;border:3px solid rgba(255,255,255,.3);opacity:.5;pointer-events:none}
+#joy i{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:rgba(255,255,255,.35)}
+#rotate{position:fixed;inset:0;z-index:50;background:var(--olive2);display:none;align-items:center;justify-content:center;text-align:center;font-size:22px;padding:30px}
+@media (orientation:portrait) and (pointer:coarse){#rotate{display:flex}}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+
+<div id="title" class="hidden">
+  <div class="coins" id="coinTag">0 allowance</div>
+  <h1 class="stencil">ARMY MEN</h1>
+  <div class="sub2 stencil">MICROPLASTIC WARFARE</div>
+  <div class="sub">Floor wars in the living room, kitchen and backyard</div>
+  <div class="stack">
+    <button class="b go stencil" data-act="play">DEPLOY</button>
+    <button class="b" data-act="barracks">Barracks</button>
+    <button class="b" data-act="record">Service Record</button>
+    <button class="b" data-act="options">Options</button>
+    <button class="b" data-act="full">Full screen</button>
+  </div>
+</div>
+
+<div id="menu" class="hidden"></div>
+
+<div id="hud" class="hidden">
+  <div id="topbar"><div id="scores" class="row" style="gap:6px"></div><div id="clock">6:00</div><button id="pauseB">II</button></div>
+  <div id="vitals"><div id="hpbar"><div id="hpfill"></div></div><div id="vhp" class="hidden"><div id="vhpname" style="font-size:12px;margin-top:4px"></div><div id="hpbar" style="height:8px"><div id="vhpfill" style="height:100%;background:#e8b830"></div></div></div><div id="ammo"></div><div id="feed"></div></div>
+  <canvas id="mini"></canvas>
+  <div id="scope" class="hidden"></div>
+  <div id="tankSight" class="hidden"><i></i></div>
+  <div id="cross"><i></i><i></i><i></i><i></i></div>
+  <div id="hurt"></div>
+  <div id="toast"></div>
+  <div id="fps" class="hidden" style="position:absolute;left:50%;top:calc(42px + env(safe-area-inset-top));transform:translateX(-50%);font-size:12px;opacity:.8"></div>
+  <div id="callout" class="stencil"></div>
+  <div id="lock" class="hidden"></div><div id="lockT" class="hidden">LOCKING</div>
+  <div id="dead" class="hidden"><div class="big stencil">KNOCKED OVER</div><div id="deadT">Back in 4</div><div class="lbl" style="color:#fff;opacity:.85">Next piece</div><div class="row" id="deadCls"></div></div>
+</div>
+
+<div id="touch" class="hidden">
+  <div id="joy" class="hidden"><i></i></div>
+  <div class="tb" id="bFire" data-btn="fire">FIRE</div>
+  <div class="tb" id="bAim" data-btn="aim">AIM</div>
+  <div id="fireStick" class="hidden"></div>
+  <div class="tb" id="bJump" data-btn="jump">JUMP</div>
+  <div class="tb" id="bNade" data-btn="nade">NADE</div>
+  <div class="tb hidden" id="bScope" data-btn="scope">SCOPE</div>
+  <div class="tb" id="bReload" data-btn="reload">RELOAD</div>
+  <div class="tb" id="bMelee" data-btn="melee">SMACK</div>
+  <div class="tb" id="bView" data-btn="view">VIEW</div>
+  <div class="tb" id="bCrouch" data-btn="crouch">CROUCH</div>
+  <div class="tb hidden" id="bUse" data-btn="use">GET IN</div>
+</div>
+
+<div id="rotate"><div><div class="stencil" style="font-size:34px">ARMY MEN</div><div class="stencil" style="color:#ffe27a">MICROPLASTIC WARFARE</div>Turn your phone sideways to play</div></div>
+<script>/*BUNDLE*/</script>
+<script>try { if (location.protocol === 'https:' && window.top === window && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js'); } catch (e) {}</script>
+</body>
+</html>
